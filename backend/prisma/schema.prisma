@@ -1,0 +1,281 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  STAFF
+  CASHIER
+}
+
+model Admin {
+  id             Int                 @id @default(autoincrement())
+  name           String
+  email          String              @unique
+  phone          String?
+  image          String?
+  password       String
+  role           AdminRole           @default(STAFF)
+  verified       Boolean             @default(false)
+  phone_verified Boolean             @default(false)
+  email_verified Boolean             @default(false)
+  last_active_at DateTime?
+  type           String?
+  remarks        String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  refreshTokens  AdminRefreshToken[]
+
+  @@map("admins")
+}
+
+model AdminRefreshToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @db.VarChar(255)
+  expires_at DateTime
+  adminId    Int
+  admin      Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("admin_refresh_tokens")
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  items     Item[]  
+
+  @@map("categories")
+}
+
+model Combo {
+  id          Int         @id @default(autoincrement())
+  name        String
+  price       Float
+  items       Json?
+  dateFrom    DateTime?
+  dateTo      DateTime?
+  expirable   Boolean
+  description String?     @db.Text
+  image       String?
+  status      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+
+  @@map("combos")
+}
+
+model ComboItem {
+  comboId   Int
+  itemId    Int
+
+  @@id([comboId, itemId])
+  @@map("combo_items")
+}
+
+model Customer {
+  id               Int       @id @default(autoincrement())
+  name             String
+  phone            String
+  email            String?
+  availableCredit  Float?
+  currentCredit    Float?
+  totalOrders      Int?      @default(0)
+  totalOrderAmount Float?    @default(0.0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  orders           Order[]
+  payments         Payment[]
+
+  @@map("customers")
+}
+
+model Inventory {
+  id          Int      @id @default(autoincrement())
+  itemId      Int      @unique
+  quantity    Int      @default(0)
+  threshold   Int      @default(10)
+  lastUpdated DateTime @default(now())
+  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("inventories")
+}
+
+model InventoryAdjustment {
+  id         Int      @id @default(autoincrement())
+  itemId     Int
+  quantity   Int     
+  type       String   
+  note       String?  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("inventory_adjustments")
+}
+
+model LoyaltyProgram {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  discount            Float
+  totalOrdersRequired Int
+  totalAmountSpent    Float
+  description         String?  @db.Text
+  validFrom           DateTime
+  validTo             DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("loyalty_programs")
+}
+
+model Miscellaneous {
+  id                  Int      @id @default(autoincrement())
+  miscellaneousReason String
+  costOrPrice         Float
+  reason              String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("miscellaneous")
+}
+
+model Order {
+  id           Int         @id @default(autoincrement())
+  tableId      Int?
+  customerId   Int?
+  total_amount Float?
+  payment_mode String?
+  guests       Int
+  status       String      @default("pending")
+  cancelReason String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  order_items  OrderItem[]
+  payments     Payment[]
+  table        Table?      @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  itemId     Int?
+  comboId    Int?
+  quantity   Int
+  unit       String?
+  price      Float
+  totalPrice Float    @default(0.0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item       Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  combo      Combo?   @relation(fields: [comboId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Payment {
+  id                      Int       @id @default(autoincrement())
+  orderId                 Int
+  customerId              Int?
+  paidAmount              Float
+  paymentMethod           String
+  paymentStatus           String    @default("completed")
+  paymentDate             DateTime  @default(now())
+  paymentReference        String?
+  vatPercentage           Float?
+  vatAmount               Float?
+  serviceChargePercentage Float?
+  serviceChargeAmount     Float?
+  tipAmount               Float?
+  remainingAmount         Float?
+  currency                String?
+  remarks                 String?
+  discountPercent         Float?
+  discountAmount          Float?
+  priceBeforeDiscount     Float?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  order                   Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer                Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@map("payments")
+}
+
+model Item {
+  id               Int         @id @default(autoincrement())
+  name             String
+  price            Float
+  categoryId       Int
+  image            String?
+  hide             Boolean     @default(false)
+  unit             String?
+  isLimited        Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  category         Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  inventory        Inventory?
+  orderItems       OrderItem[]
+  inventoryAdjustments InventoryAdjustment[] 
+
+  @@map("items")
+}
+
+model Table {
+  id           Int           @id @default(autoincrement())
+  name         String
+  code         String
+  status       String        @default("available")
+  hide         Boolean       @default(false)
+  capacity     Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  orders       Order[]
+
+  @@map("tables")
+}
+
+model TokenBlacklist {
+  id         Int      @id @default(autoincrement())
+  token      String   @db.VarChar(500)
+  expires_at DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("token_blacklists")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      
+  userEmail   String   
+  userRole    String   
+  action      String   
+  entity      String   
+  entityId    Int?     
+  changes     Json?    
+  ipAddress   String?  
+  userAgent   String?  
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
